@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Main App Theme -->
+    <style name="Theme.Curotel" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- Status bar color -->
+        <item name="android:statusBarColor">@color/splash_background</item>
+        <item name="android:navigationBarColor">@color/splash_background</item>
+    </style>
+
+    <!-- Splash Screen Theme (Android 12+) -->
+    <style name="Theme.Curotel.Splash" parent="Theme.Curotel">
+        <!-- Background color of the splash screen -->
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <!-- Animated icon shown during splash -->
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <!-- Duration to show the icon (not needed if using video after) -->
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/splash_background</item>
+    </style>
+</resources>
