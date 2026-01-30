@@ -74,6 +74,7 @@ dependencies {
     
     // Agora Video SDK for telemedicine
     implementation(libs.agora.rtc)
+    implementation(libs.agora.chat)
     
     // Media3 ExoPlayer for video splash screen
     implementation(libs.androidx.media3.exoplayer)

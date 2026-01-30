@@ -32,8 +32,12 @@ coroutines = "1.8.1"
 
 # Agora Video SDK
 agora = "4.2.6"
+agoraChat = "1.3.2"
 
 [libraries]
+# Agora Chat SDK
+agora-chat = { group = "io.agora.rtc", name = "chat-sdk", version.ref = "agoraChat" }
+
 # Navigation
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 

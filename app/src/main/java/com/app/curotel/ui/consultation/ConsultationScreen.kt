@@ -59,6 +59,8 @@ fun ConsultationScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val doctorInfo by viewModel.doctorInfo.collectAsStateWithLifecycle()
+    val isDoctorMode by viewModel.isDoctorMode.collectAsStateWithLifecycle()
+    val showChatScreen by viewModel.showChatScreen.collectAsStateWithLifecycle()
     
     // Permission state
     var permissionsGranted by remember { 
@@ -115,6 +117,8 @@ fun ConsultationScreen(
             is ConsultationUiState.Idle -> {
                 PreConsultationScreen(
                     doctorInfo = doctorInfo,
+                    isDoctorMode = isDoctorMode,
+                    onToggleRole = { viewModel.toggleRole() },
                     onStartConsultation = startCallWithPermissions,
                     onBack = onBack
                 )
@@ -136,7 +140,7 @@ fun ConsultationScreen(
             is ConsultationUiState.InCall -> {
                 VideoCallScreen(
                     viewModel = viewModel,
-                    onEndCall = { viewModel.endConsultation() }
+                    onCallEnd = { viewModel.endConsultation() }
                 )
             }
             is ConsultationUiState.Reconnecting -> {
@@ -208,6 +212,8 @@ fun PermissionDeniedDialog(
 @Composable
 fun PreConsultationScreen(
     doctorInfo: DoctorInfo,
+    isDoctorMode: Boolean,
+    onToggleRole: () -> Unit,
     onStartConsultation: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -233,6 +239,43 @@ fun PreConsultationScreen(
         )
         
         Spacer(modifier = Modifier.height(32.dp))
+
+        // Role Selector (For Testing)
+        GlassCard(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = "Testing Role",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextGrey
+                    )
+                    Text(
+                        text = if (isDoctorMode) "👨‍⚕️ Doctor" else "👤 Patient",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = if (isDoctorMode) NeonLime else NeonCyan
+                    )
+                }
+                
+                Switch(
+                    checked = isDoctorMode,
+                    onCheckedChange = { onToggleRole() },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = DeepSpaceBlack,
+                        checkedTrackColor = NeonLime,
+                        uncheckedThumbColor = DeepSpaceBlack,
+                        uncheckedTrackColor = NeonCyan
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
         
         // Doctor Card
         GlassCard(modifier = Modifier.fillMaxWidth()) {
@@ -665,296 +708,8 @@ fun StatusItem(icon: String, label: String) {
 }
 
 
-/**
- * Active video call screen
- */
-@Composable
-fun VideoCallScreen(
-    viewModel: ConsultationViewModel,
-    onEndCall: () -> Unit
-) {
-    val remoteParticipants by viewModel.remoteParticipants.collectAsStateWithLifecycle()
-    val isLocalVideoEnabled by viewModel.isLocalVideoEnabled.collectAsStateWithLifecycle()
-    val isLocalAudioEnabled by viewModel.isLocalAudioEnabled.collectAsStateWithLifecycle()
-    val isVitalsSharing by viewModel.isVitalsSharing.collectAsStateWithLifecycle()
-    val currentVitals by viewModel.currentVitals.collectAsStateWithLifecycle()
-    val callDuration by viewModel.callDuration.collectAsStateWithLifecycle()
-    val networkQuality by viewModel.networkQuality.collectAsStateWithLifecycle()
-    
-    Box(modifier = Modifier.fillMaxSize().background(DeepSpaceBlack)) {
-        // 1. Remote video (Full Screen Layer)
-        if (remoteParticipants.isNotEmpty()) {
-            AgoraRemoteVideoView(
-                modifier = Modifier.fillMaxSize(),
-                uid = remoteParticipants.first().uid,
-                onSurfaceReady = { surface, uid ->
-                    viewModel.setupRemoteVideo(surface, uid)
-                }
-            )
-        } else {
-            // Waiting State
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = NeonCyan)
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Waiting for doctor...",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TextGrey
-                    )
-                }
-            }
-        }
-        
-        // 2. UI Overlay Layer (Gradient for readability)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp)
-                .align(Alignment.TopCenter)
-                .background(
-                    androidx.compose.ui.graphics.Brush.verticalGradient(
-                        colors = listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent)
-                    )
-                )
-        )
-        
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(180.dp)
-                .align(Alignment.BottomCenter)
-                .background(
-                    androidx.compose.ui.graphics.Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
-                    )
-                )
-        )
-
-        // 3. Top Info Bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(16.dp)
-                .align(Alignment.TopCenter),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Duration Pill
-            Surface(
-                color = GlassSurface.copy(alpha = 0.6f),
-                shape = CircleShape,
-                border = BorderStroke(1.dp, GlassSurface.copy(alpha = 0.3f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .background(NeonRose, CircleShape)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = viewModel.formatDuration(callDuration),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = TextWhite
-                    )
-                }
-            }
-            
-            // Network Quality
-            NetworkQualityIndicator(quality = networkQuality)
-        }
-        
-        // 4. Local Video (Picture-in-Picture)
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 80.dp, end = 16.dp)
-                .size(100.dp, 150.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.Black)
-                .border(2.dp, GlassSurface.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-        ) {
-            if (isLocalVideoEnabled) {
-                AgoraLocalVideoView(
-                    modifier = Modifier.fillMaxSize(),
-                    onSurfaceReady = { surface ->
-                        viewModel.setupLocalVideo(surface)
-                    }
-                )
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("📷", style = MaterialTheme.typography.titleLarge)
-                }
-            }
-        }
-        
-        // 5. Vitals Overlay (Left side)
-        AnimatedVisibility(
-            visible = isVitalsSharing,
-            enter = slideInHorizontally { -it } + fadeIn(),
-            exit = slideOutHorizontally { -it } + fadeOut(),
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 16.dp)
-        ) {
-            VitalsOverlay(vitals = currentVitals)
-        }
-        
-        // 6. Bottom Controls
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 40.dp)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Mic
-            ControlFab(
-                icon = if (isLocalAudioEnabled) "🎙️" else "🔇",
-                isActive = isLocalAudioEnabled,
-                onClick = { viewModel.toggleMute() }
-            )
-            
-            // Camera
-            ControlFab(
-                icon = if (isLocalVideoEnabled) "📹" else "📷",
-                isActive = isLocalVideoEnabled,
-                onClick = { viewModel.toggleCamera() }
-            )
-            
-            // End Call (Big Red Button)
-            FloatingActionButton(
-                onClick = onEndCall,
-                containerColor = NeonRose,
-                contentColor = Color.White,
-                shape = CircleShape,
-                modifier = Modifier.size(72.dp)
-            ) {
-                Text("📞", style = MaterialTheme.typography.headlineMedium)
-            }
-            
-            // Flip
-            ControlFab(
-                icon = "🔄",
-                isActive = true,
-                onClick = { viewModel.switchCamera() }
-            )
-            
-            // Vitals
-            ControlFab(
-                icon = "❤️",
-                isActive = isVitalsSharing,
-                activeColor = NeonRose,
-                onClick = { viewModel.toggleVitalsSharing() }
-            )
-        }
-    }
-}
-
-@Composable
-fun ControlFab(
-    icon: String,
-    isActive: Boolean,
-    activeColor: Color = GlassSurface,
-    onClick: () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        shape = CircleShape,
-        color = if (isActive) activeColor else Color.Black.copy(alpha = 0.6f),
-        border = if (!isActive) BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)) else null,
-        modifier = Modifier.size(56.dp)
-            .scaleOnPress()
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(text = icon, style = MaterialTheme.typography.titleMedium)
-        }
-    }
-}
-
-@Composable
-fun NetworkQualityIndicator(quality: Int) {
-    Surface(
-        color = GlassSurface.copy(alpha = 0.6f),
-        shape = CircleShape,
-        border = BorderStroke(1.dp, GlassSurface.copy(alpha = 0.3f))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "📶", 
-                style = MaterialTheme.typography.labelSmall
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            // Signal bars
-            Row(verticalAlignment = Alignment.Bottom) {
-                repeat(4) { index ->
-                    Box(
-                        modifier = Modifier
-                            .padding(horizontal = 1.dp)
-                            .width(3.dp)
-                            .height(((index + 1) * 3).dp)
-                            .background(
-                                if (index < (quality.coerceIn(0, 4))) NeonLime else Color.White.copy(alpha = 0.3f),
-                                RoundedCornerShape(1.dp)
-                            )
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun VitalsOverlay(vitals: VitalsPacket) {
-    Surface(
-        color = Color.Black.copy(alpha = 0.4f),
-        shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, GlassSurface.copy(alpha = 0.3f)),
-        modifier = Modifier.width(100.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            VitalItem(icon = "❤️", value = vitals.heartRate?.toString() ?: "--", unit = "BPM", color = NeonRose)
-            VitalItem(icon = "💨", value = vitals.spo2?.toString() ?: "--", unit = "%", color = NeonCyan)
-            VitalItem(icon = "🌡️", value = vitals.temperature?.let { String.format("%.1f", it) } ?: "--", unit = "°C", color = NeonLime)
-        }
-    }
-}
-
-@Composable
-fun VitalItem(icon: String, value: String, unit: String, color: Color) {
-    Column {
-        Text(icon, style = MaterialTheme.typography.labelMedium)
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = color
-        )
-        Text(
-            text = unit,
-            style = MaterialTheme.typography.labelSmall,
-            color = TextGrey.copy(alpha = 0.8f)
-        )
-    }
-}
+// VideoCallScreen moved into separate file
+// VitalsOverlay moved into separate file
 
 
 

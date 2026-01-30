@@ -39,6 +39,7 @@ class MainActivity : ComponentActivity() {
                 
                 // Get ViewModel using Hilt
                 val viewModel: DeviceViewModel = hiltViewModel()
+                val consultationViewModel: com.app.curotel.viewmodel.ConsultationViewModel = hiltViewModel()
                 
                 // Only show bottom nav on main screens (not splash or onboarding)
                 val showBottomNav = currentRoute !in listOf(
@@ -76,7 +77,8 @@ class MainActivity : ComponentActivity() {
                     ) {
                         CurotelNavHost(
                             navController = navController,
-                            viewModel = viewModel
+                            viewModel = viewModel,
+                            consultationViewModel = consultationViewModel
                         )
                     }
                 }

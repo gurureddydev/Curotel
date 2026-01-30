@@ -48,9 +48,24 @@ data class DoctorInfo(
 @HiltViewModel
 class ConsultationViewModel @Inject constructor(
     private val agoraService: AgoraVideoService,
+    private val agoraChatService: com.app.curotel.service.agora.AgoraChatService,
     private val deviceRepository: DeviceRepository
 ) : ViewModel() {
     
+    init {
+        agoraChatService.initialize()
+    }
+    
+    // ========== Role State ==========
+    private val _isDoctorMode = MutableStateFlow(false)
+    val isDoctorMode: StateFlow<Boolean> = _isDoctorMode.asStateFlow()
+
+    fun toggleRole() {
+        _isDoctorMode.value = !_isDoctorMode.value
+        // Logout of chat so we can re-login with new role
+        agoraChatService.logout()
+    }
+
     // ========== Agora State ==========
     
     val callState: StateFlow<CallState> = agoraService.callState
@@ -78,6 +93,17 @@ class ConsultationViewModel @Inject constructor(
     
     private val _currentChannelId = MutableStateFlow("")
     val currentChannelId: StateFlow<String> = _currentChannelId.asStateFlow()
+    
+    // ========== Chat State ==========
+    val chatMessages = agoraChatService.messages
+    
+    // Controls if the Chat Screen acts as a full separate screen overlay
+    private val _showChatScreen = MutableStateFlow(false)
+    val showChatScreen: StateFlow<Boolean> = _showChatScreen.asStateFlow()
+    
+    // Kept for backward compatibility if needed, but primarily using showChatScreen now
+    private val _isChatVisible = MutableStateFlow(false)
+    val isChatVisible: StateFlow<Boolean> = _isChatVisible.asStateFlow()
     
     // Vitals from device
     val currentVitals: StateFlow<VitalsPacket> = deviceRepository.currentVitals
@@ -174,11 +200,40 @@ class ConsultationViewModel @Inject constructor(
                 val channelId = AgoraConfig.DEMO_CHANNEL
                 _currentChannelId.value = channelId
                 
-                // Join the channel with null token (Testing Mode in Agora Console)
+                // PRIORITY 1: USE TEMP TOKEN FROM CONFIG IF SET
+                // PRIORITY 2: GENERATE LOCAL TOKEN IF CERTIFICATE PRESENT
+                // PRIORITY 3: NULL (TESTING MODE ONLY)
+                val token = if (AgoraConfig.TEMP_TOKEN?.isNotBlank() == true) {
+                    AgoraConfig.TEMP_TOKEN
+                } else if (AgoraConfig.APP_CERTIFICATE?.isNotEmpty() == true) {
+                    com.app.curotel.service.agora.AgoraTokenGenerator.generateToken(
+                        AgoraConfig.APP_ID,
+                        AgoraConfig.APP_CERTIFICATE!!,
+                        channelId,
+                        0, // uid
+                        1, // role publisher
+                        (System.currentTimeMillis() / 1000 + 3600).toInt() // 1 hour expiry
+                    )
+                } else null
+
                 agoraService.joinChannel(
-                    token = null, // No token needed in Testing Mode
+                    token = token,
                     channelId = channelId,
                     uid = 0 // Auto-assign UID
+                )
+                
+                // Login to Chat with configured credentials based on selected role
+                val isDoctor = _isDoctorMode.value
+                val chatUser = if (isDoctor) AgoraConfig.DEMO_USER_DOCTOR else AgoraConfig.DEMO_USER_PATIENT
+                val chatToken = if (isDoctor) AgoraConfig.CHAT_TOKEN_DOCTOR else AgoraConfig.CHAT_TOKEN_PATIENT
+                
+                agoraChatService.login(chatUser, chatToken ?: "", 
+                    onSuccess = { 
+                        android.util.Log.d("ConsultationVM", "Chat login success as $chatUser")
+                    },
+                    onError = { code, msg ->
+                        android.util.Log.e("ConsultationVM", "Chat login failed: $code - $msg")
+                    }
                 )
                 
                 _uiState.value = ConsultationUiState.WaitingForDoctor
@@ -206,10 +261,34 @@ class ConsultationViewModel @Inject constructor(
             try {
                 _currentChannelId.value = channelId
                 
+                // PRIORITY 1: USE TEMP TOKEN FROM CONFIG IF SET
+                val token = if (AgoraConfig.TEMP_TOKEN?.isNotBlank() == true) {
+                    AgoraConfig.TEMP_TOKEN
+                } else if (AgoraConfig.APP_CERTIFICATE?.isNotEmpty() == true) {
+                    com.app.curotel.service.agora.AgoraTokenGenerator.generateToken(
+                        AgoraConfig.APP_ID,
+                        AgoraConfig.APP_CERTIFICATE!!,
+                        channelId,
+                        0,
+                        1,
+                        (System.currentTimeMillis() / 1000 + 3600).toInt()
+                    )
+                } else null
+                
                 agoraService.joinChannel(
-                    token = null,
+                    token = token,
                     channelId = channelId,
                     uid = 0
+                )
+                
+                // Login to Chat with configured credentials
+                val isDoctor = _isDoctorMode.value
+                val chatUser = if (isDoctor) AgoraConfig.DEMO_USER_DOCTOR else AgoraConfig.DEMO_USER_PATIENT
+                val chatToken = if (isDoctor) AgoraConfig.CHAT_TOKEN_DOCTOR else AgoraConfig.CHAT_TOKEN_PATIENT
+                
+                agoraChatService.login(chatUser, chatToken ?: "", 
+                    onSuccess = { android.util.Log.d("ConsultationVM", "Chat login success") },
+                    onError = { code, msg -> android.util.Log.e("ConsultationVM", "Chat error: $code") }
                 )
                 
                 _uiState.value = ConsultationUiState.WaitingForDoctor
@@ -295,6 +374,36 @@ class ConsultationViewModel @Inject constructor(
     fun toggleVitalsSharing() {
         _isVitalsSharing.value = !_isVitalsSharing.value
     }
+
+    // ========== Chat Actions ==========
+
+    fun toggleChat() {
+        // Toggle the full screen chat state
+        _showChatScreen.value = !_showChatScreen.value
+        // Also toggle the old overlay state just in case
+        _isChatVisible.value = !_isChatVisible.value
+    }
+    
+    fun navigateToChat() {
+        _showChatScreen.value = true
+    }
+    
+    fun navigateToVideoCall() {
+        _showChatScreen.value = false
+    }
+
+    fun sendChatMessage(content: String) {
+        if (!AgoraConfig.isChatConfigured()) {
+            android.util.Log.e("ConsultationVM", "Chat not configured")
+            return
+        }
+        
+        // Target the *other* user
+        val isDoctor = _isDoctorMode.value
+        val targetUser = if (isDoctor) AgoraConfig.DEMO_USER_PATIENT else AgoraConfig.DEMO_USER_DOCTOR
+        
+        agoraChatService.sendMessage(content, targetUser)
+    }
     
     // ========== Timer ==========
     
@@ -318,8 +427,47 @@ class ConsultationViewModel @Inject constructor(
     
     // ========== Cleanup ==========
     
+
+
+    /**
+     * Ensure we are logged into Chat
+     * Called when ChatScreen is opened directly
+     */
+    fun ensureChatLogin() {
+        val isDoctor = _isDoctorMode.value
+        val expectedUser = if (isDoctor) AgoraConfig.DEMO_USER_DOCTOR else AgoraConfig.DEMO_USER_PATIENT
+        val expectedToken = if (isDoctor) AgoraConfig.CHAT_TOKEN_DOCTOR else AgoraConfig.CHAT_TOKEN_PATIENT
+
+        if (agoraChatService.isLoggedIn()) {
+            val currentUser = agoraChatService.getCurrentUser()
+            if (currentUser == expectedUser) {
+                android.util.Log.d("ConsultationVM", "Already logged in as correct user: $currentUser")
+                return
+            } else {
+                android.util.Log.w("ConsultationVM", "Logged in as wrong user ($currentUser), expected $expectedUser. Relogging...")
+                agoraChatService.logout()
+            }
+        }
+        
+        if (!AgoraConfig.isChatConfigured()) return
+        
+        android.util.Log.d("ConsultationVM", "Auto-logging in to chat as $expectedUser")
+        
+        agoraChatService.login(expectedUser, expectedToken ?: "", 
+            onSuccess = { 
+                android.util.Log.d("ConsultationVM", "Chat auto-login success")
+                // Refresh messages or notify UI if needed
+            },
+            onError = { code, msg ->
+                android.util.Log.e("ConsultationVM", "Chat auto-login failed: $code - $msg")
+            }
+        )
+    }
+
     override fun onCleared() {
         agoraService.destroy()
+        // Don't destroy ChatService as it is Singleton and might be reused
+        // agoraChatService.onDestroy() 
         super.onCleared()
     }
 }

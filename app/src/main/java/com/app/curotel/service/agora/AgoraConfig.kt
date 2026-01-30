@@ -19,19 +19,44 @@ package com.app.curotel.service.agora
 object AgoraConfig {
     
     // ==========================================
-    // YOUR AGORA APP ID
+    // YOUR AGORA APP ID (Already configured ✓)
     // ==========================================
     const val APP_ID = "ce71399d624c419cacf6799e506e2d80"
     
     // ==========================================
-    // PASTE YOUR TEMP TOKEN HERE!
-    // Generate from: console.agora.io → Your Project → Generate Temp Token
+    // AGORA CHAT APP KEY
+    // Format: "orgname#appname"
+    // Get from: console.agora.io → Project → Chat → Enable → Copy App Key
+    // ==========================================
+    const val CHAT_APP_KEY = "4110013852#1649808"  // <-- REPLACE with real value!
+    
+    // ==========================================
+    // RTC VIDEO TOKEN
+    // Generate from: console.agora.io → Build → Temp Token
     // Channel Name: curotel_demo_room
     // ==========================================
-    val TEMP_TOKEN: String? = null  // <-- PASTE TOKEN HERE!
+    val TEMP_TOKEN: String? = "007eJxTYJBdf+/4k/LtTr8YZ3AcvpviWh4xTfVa3OO9WXPP1cn0HNRVYEhONTc0trRMMTMySTYxtExOTE4zM7e0TDU1MEs1SrEw+NBTntkQyMig1WPKzMgAgSC+IENyaVF+SWpOfEpqbn58UX5+LgMDAJXXJfc="  // <-- Paste RTC token here
     
-    // Fixed channel name for demo - both patient and doctor join this channel
-    // IMPORTANT: Use this SAME channel name when generating the temp token!
+    // ==========================================
+    // CHAT TOKENS (for local testing)
+    // Generate from: console.agora.io → Chat → Temp Token Generator
+    // ==========================================
+    // Token for patient1
+    val CHAT_TOKEN_PATIENT: String? = "007eJxTYDj4tmXNxOKVRVXH9BJs5TvXBarkN72pF004/qsiLkpVJEeBITnV3NDY0jLFzMgk2cTQMjkxOc3M3NIy1dTALNUoxcLgcWd5ZkMgI4PQ4wpmRgZWBkYgBPFVGEzMUgxTE5MNdNMSk5N1DQ3TDHSTkpIsdM2MLUyMLQwTk4wNUgF5eieX"
+    
+    // Token for doctor1
+    val CHAT_TOKEN_DOCTOR: String? = "007eJxTYPj0/LN8eRtvv3D32ocp8ZYzT38PksvwWDrjLFPu2iXec24qMCSnmhsaW1qmmBmZJJsYWiYnJqeZmVtappoamKUapVgYeHeWZzYEMjLYvnJhZmRgZWAEQhBfhcEk1cLC0NLMQDctMTlZ19AwzUDXwtjEQtfA0jTNxAiIDFKTANE0J58="
+    
+    // ==========================================
+    // DEMO USER IDs (Create in Console → Chat → User Management)
+    // ==========================================
+    const val DEMO_USER_PATIENT = "patient1"
+    const val DEMO_USER_DOCTOR = "doctor1"
+    
+    // App Certificate (optional - for local token generation)
+    val APP_CERTIFICATE: String? = null
+    
+    // Fixed channel name for demo - both participants join this channel
     const val DEMO_CHANNEL = "curotel_demo_room"
     
     /**
@@ -66,5 +91,14 @@ object AgoraConfig {
      */
     fun hasToken(): Boolean {
         return TEMP_TOKEN != null && TEMP_TOKEN != "YOUR_TEMP_TOKEN_HERE" && TEMP_TOKEN.isNotBlank()
+    }
+    
+    /**
+     * Check if Chat is properly configured
+     */
+    fun isChatConfigured(): Boolean {
+        return CHAT_APP_KEY != "YOUR_ORG#YOUR_APP" && 
+               CHAT_APP_KEY.contains("#") && 
+               CHAT_APP_KEY.isNotBlank()
     }
 }

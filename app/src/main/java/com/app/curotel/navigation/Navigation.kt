@@ -8,6 +8,7 @@ import androidx.navigation.compose.composable
 import com.app.curotel.ui.dashboard.DashboardScreen
 import com.app.curotel.ui.history.HistoryScreen
 import com.app.curotel.ui.consultation.ConsultationScreen
+import com.app.curotel.ui.consultation.ChatScreen
 import com.app.curotel.ui.onboarding.OnboardingScreen
 import com.app.curotel.ui.settings.SettingsScreen
 import com.app.curotel.ui.splash.SplashScreen
@@ -22,6 +23,7 @@ sealed class Screen(val route: String) {
     object Home : Screen("home")
     object History : Screen("history")
     object Consult : Screen("consult")
+    object Chat : Screen("chat")
     object Settings : Screen("settings")
 }
 
@@ -32,6 +34,7 @@ sealed class Screen(val route: String) {
 fun CurotelNavHost(
     navController: NavHostController,
     viewModel: DeviceViewModel,
+    consultationViewModel: com.app.curotel.viewmodel.ConsultationViewModel,
     startDestination: String = Screen.Splash.route,
     modifier: Modifier = Modifier
 ) {
@@ -75,9 +78,22 @@ fun CurotelNavHost(
         // Consult Screen - Now uses Agora Video SDK
         composable(Screen.Consult.route) {
             ConsultationScreen(
+                viewModel = consultationViewModel,
                 onBack = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Consult.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        // Chat Screen
+        composable(Screen.Chat.route) {
+            ChatScreen(
+                viewModel = consultationViewModel,
+                onBack = {
+                    navController.navigate(Screen.Consult.route) {
+                        popUpTo(Screen.Chat.route) { inclusive = true }
                     }
                 }
             )

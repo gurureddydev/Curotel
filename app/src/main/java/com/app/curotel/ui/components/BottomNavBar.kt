@@ -33,6 +33,7 @@ fun CurotelBottomNavBar(
         BottomNavItem(Screen.Home, "🏠", "Home"),
         BottomNavItem(Screen.History, "📊", "History"),
         BottomNavItem(Screen.Consult, "📹", "Consult"),
+        BottomNavItem(Screen.Chat, "💬", "Chat"),
         BottomNavItem(Screen.Settings, "⚙️", "Settings")
     )
     
